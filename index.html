@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <svg width="960" height="1100"></svg>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <script src="https://d3js.org/topojson.v2.min.js"></script>
+</head>
+<body>
+<script>
+
+    var svg = d3.select("svg"),
+        width = +svg.attr("width"),
+        height = +svg.attr("height");
+
+    var path = d3.geoPath();
+
+    var color = d3.scaleThreshold()
+        .domain([1, 10, 50, 200, 500, 1000, 2000, 4000])
+        .range(d3.schemeOrRd[9]);
+
+    var color_2 = d3.scaleThreshold()
+        .domain([1, 10, 50, 200, 500, 1000, 2000, 4000])
+        .range(d3.schemePuBu[9]);
+
+    var x = d3.scaleSqrt()
+        .domain([0, 4500])
+        .rangeRound([440, 950]);
+
+    var g = svg.append("g")
+        .attr("class", "key")
+        .attr("transform", "translate(0,40)");
+    
+    //title
+    g.append("text")
+        .attr("x", 200)
+        .attr("y", 10)
+        .attr("fill", "#000")
+        .text(" Iowa Population Density, 2016")
+        .style("font-size", "22px");
+    
+    g.selectAll("rect")
+        .data(color.range().map(function (d) {
+            d = color.invertExtent(d);
+            if (d[0] == null) d[0] = x.domain()[0];
+            if (d[1] == null) d[1] = x.domain()[1];
+            console.log('1', x(d[0]));
+            return d;
+        }))
+        .enter().append("rect")
+        .attr("class", "rects")
+        .attr("height", 8)
+        .attr("x", function (d) {
+            console.log('1x', x(d[0]));
+            return x(d[0]);
+        })
+        .attr("width", function (d) {
+            return x(d[1]) - x(d[0]);
+        })
+        .attr("fill", function (d) {
+            return color_2(d[0]);
+        });
+
+    var click_time = 1;
+    var color_change = null;
+    var census_exist = 1;
+    var state_boundry_exist = 2;
+
+    g.append("ellipse")
+        .attr("cx", 500)
+        .attr("cy", 50)
+        .attr("rx", 60)
+        .attr("ry", 14)
+        .attr("fill", "#fff")
+        .attr("stroke", "#000")
+        .on("click", function () {
+            change_color();
+        });
+
+    g.append("ellipse")
+        .attr("cx", 650)
+        .attr("cy", 50)
+        .attr("rx", 85)
+        .attr("ry", 14)
+        .attr("fill", "#fff")
+        .attr("stroke", "#000")
+        .on("click", function () {
+            toggle_census();
+        });
+
+
+    g.append("ellipse")
+        .attr("cx", 830)
+        .attr("cy", 50)
+        .attr("rx", 85)
+        .attr("ry", 14)
+        .attr("fill", "#fff")
+        .attr("stroke", "#000")
+        .on("click", function () {
+            toggle_state();
+        });
+
+
+    g.append("text")
+        .attr("x", 500)
+        .attr("y", 55)
+        .attr("fill", "#000")
+        .text("change lengend color")
+        .on("click", function () {
+            change_color();
+        });
+
+    g.append("text")
+        .attr("x", 645)
+        .attr("y", 55)
+        .attr("fill", "#000")
+        .text("Toggle Census Tract Boundary")
+        .on("click", function () {
+            toggle_census();
+        });
+
+    g.append("text")
+        .attr("x", 822)
+        .attr("y", 55)
+        .attr("fill", "#000")
+        .text("Toggle Census Tract Boundary")
+        .on("click", function () {
+            toggle_state();
+        });
+
+    g.append("text")
+        .attr("class", "caption")
+        .attr("x", x.range()[0])
+        .attr("y", -6)
+        .attr("fill", "#000")
+        .attr("text-anchor", "start")
+        .attr("font-weight", "bold")
+        .text("Population per square mile");
+
+
+    g.call(d3.axisBottom(x)
+        .tickSize(13)
+        .tickValues(color.domain()))
+        .select(".domain")
+        .remove();
+
+    d3.json("iowa-topo.json", function (error, topology) {
+        if (error) throw error;
+        density_data = topology;
+        svg.append("g")
+            .selectAll("path")
+            .data(topojson.feature(topology, topology.objects.tracts).features)
+            .enter().append("path")
+            .attr("class", "path_color")
+            .attr("fill", function (d) {
+
+                return color_2(d.properties.density);
+            })
+            .attr("d", path);
+
+        svg.append("path")
+            .datum(topojson.feature(topology, topology.objects.counties))
+            .attr("fill", "none")
+            .attr("stroke", "#000")
+            .attr("stroke-opacity", 0.3)
+            .attr("d", path);
+    });
+
+    function change_color() {
+        var iowa_json = null;
+        if (click_time == 1) {
+            color_change = color;
+            click_time = 2;
+        } else {
+            color_change = color_2;
+            click_time = 1;
+        }
+        if (state_boundry_exist == 1) {
+            iowa_json = "iowa-merge-topo.json"
+        } else {
+            iowa_json = "iowa-topo.json"
+        }
+
+        g.selectAll(".rects").remove();
+        g.selectAll("rect")
+            .data(color.range().map(function (d) {
+                d = color.invertExtent(d);
+                if (d[0] == null) d[0] = x.domain()[0];
+                if (d[1] == null) d[1] = x.domain()[1];
+                console.log(x(d[0]));
+                return d;
+            })).enter().append("rect")
+            .attr("class", "rects")
+            .attr("height", 8)
+            .attr("x", function (d) {
+                console.log(x(d[0]));
+                return x(d[0]);
+            })
+            .attr("width", function (d) {
+                return x(d[1]) - x(d[0]);
+            })
+            .attr("fill", function (d) {
+                return color_change(d[0]);
+            });
+
+
+        svg.selectAll("path").remove();
+
+        if (census_exist == 1) {
+            d3.json(iowa_json, function (error, topology) {
+                if (error) throw error;
+                density_data = topology;
+                svg.append("g")
+                    .selectAll("path")
+                    .data(topojson.feature(topology, topology.objects.tracts).features)
+                    .enter().append("path")
+                    .attr("fill", function (d) {
+                        return color_change(d.properties.density);
+                    })
+                    .attr("d", path);
+
+                svg.append("path")
+                    .datum(topojson.feature(topology, topology.objects.counties))
+                    .attr("fill", "none")
+                    .attr("stroke", "#000")
+                    .attr("stroke-opacity", 0.3)
+                    .attr("d", path);
+            });
+        } else {
+            d3.json(iowa_json, function (error, topology) {
+                if (error) throw error;
+                density_data = topology;
+                svg.append("g")
+                    .selectAll("path")
+                    .data(topojson.feature(topology, topology.objects.tracts).features)
+                    .enter().append("path")
+                    .attr("fill", function (d) {
+                        return color_change(d.properties.density);
+                    })
+                    .attr("stroke", "#000")
+                    .attr("stroke-opacity", 0.3)
+                    .attr("d", path);
+
+                svg.append("path")
+                    .datum(topojson.feature(topology, topology.objects.counties))
+                    .attr("fill", "none")
+                    .attr("stroke", "#000")
+                    .attr("stroke-opacity", 0.3)
+                    .attr("d", path);
+            });
+        }
+    }
+
+    function toggle_census() {
+        if (click_time == 1) {
+            color_change = color_2;
+        } else {
+            color_change = color;
+        }
+        var iowa_json = null;
+        if (state_boundry_exist == 1) {
+            iowa_json = "iowa-merge-topo.json"
+        } else {
+            iowa_json = "iowa-topo.json"
+        }
+        if (census_exist == 1) {
+            census_exist = 2;
+            svg.selectAll("path").remove();
+            d3.json(iowa_json, function (error, topology) {
+                if (error) throw error;
+                density_data = topology;
+
+                svg.append("g")
+                    .selectAll("path")
+                    .data(topojson.feature(topology, topology.objects.tracts).features)
+                    .enter().append("path")
+                    .attr("fill", function (d) {
+                        return color_change(d.properties.density);
+                    })
+                    .attr("stroke", "#000")
+                    .attr("stroke-opacity", 0.3)
+                    .attr("d", path);
+
+                svg.append("path")
+                    .datum(topojson.feature(topology, topology.objects.counties))
+                    .attr("fill", "none")
+                    .attr("stroke", "#000")
+                    .attr("stroke-opacity", 0.3)
+                    .attr("d", path);
+            });
+        } else {
+            census_exist = 1;
+            svg.selectAll("path").remove();
+            d3.json(iowa_json, function (error, topology) {
+                if (error) throw error;
+                density_data = topology;
+                svg.append("g")
+                    .selectAll("path")
+                    .data(topojson.feature(topology, topology.objects.tracts).features)
+                    .enter().append("path")
+                    .attr("fill", function (d) {
+                        return color_change(d.properties.density);
+                    })
+                    .attr("d", path);
+
+                svg.append("path")
+                    .datum(topojson.feature(topology, topology.objects.counties))
+                    .attr("fill", "none")
+                    .attr("stroke", "#000")
+                    .attr("stroke-opacity", 0.3)
+                    .attr("d", path);
+            });
+        }
+    }
+
+    function toggle_state() {
+        if (click_time == 1) {
+            color_change = color_2;
+        } else {
+            color_change = color;
+        }
+        if (state_boundry_exist == 1) {
+            state_boundry_exist = 2;
+            if (census_exist == 1) {
+                svg.selectAll("path").remove();
+                d3.json("iowa-topo.json", function (error, topology) {
+                    if (error) throw error;
+                    density_data = topology;
+                    svg.append("g")
+                        .selectAll("path")
+                        .data(topojson.feature(topology, topology.objects.tracts).features)
+                        .enter().append("path")
+                        .attr("fill", function (d) {
+                            return color_change(d.properties.density);
+                        })
+                        .attr("d", path);
+
+                    svg.append("path")
+                        .datum(topojson.feature(topology, topology.objects.counties))
+                        .attr("fill", "none")
+                        .attr("stroke", "#000")
+                        .attr("stroke-opacity", 0.3)
+                        .attr("d", path);
+                });
+            } else {
+                svg.selectAll("path").remove();
+                d3.json("iowa-topo.json", function (error, topology) {
+                    if (error) throw error;
+                    density_data = topology;
+
+                    svg.append("g")
+                        .selectAll("path")
+                        .data(topojson.feature(topology, topology.objects.tracts).features)
+                        .enter().append("path")
+                        .attr("fill", function (d) {
+                            return color_change(d.properties.density);
+                        })
+                        .attr("stroke", "#000")
+                        .attr("stroke-opacity", 0.3)
+                        .attr("d", path);
+
+                    svg.append("path")
+                        .datum(topojson.feature(topology, topology.objects.counties))
+                        .attr("fill", "none")
+                        .attr("stroke", "#000")
+                        .attr("stroke-opacity", 0.3)
+                        .attr("d", path);
+                });
+            }
+        } else {
+            state_boundry_exist = 1;
+            if (census_exist == 1) {
+                svg.selectAll("path").remove();
+                d3.json("iowa-merge-topo.json", function (error, topology) {
+                    if (error) throw error;
+                    density_data = topology;
+                    svg.append("g")
+                        .selectAll("path")
+                        .data(topojson.feature(topology, topology.objects.tracts).features)
+                        .enter().append("path")
+                        .attr("fill", function (d) {
+                            return color_change(d.properties.density);
+                        })
+                        .attr("d", path);
+
+                    svg.append("path")
+                        .datum(topojson.feature(topology, topology.objects.counties))
+                        .attr("fill", "none")
+                        .attr("stroke", "#000")
+                        .attr("stroke-opacity", 0.3)
+                        .attr("d", path);
+                });
+            } else {
+                svg.selectAll("path").remove();
+                d3.json("iowa-merge-topo.json", function (error, topology) {
+                    if (error) throw error;
+                    density_data = topology;
+
+                    svg.append("g")
+                        .selectAll("path")
+                        .data(topojson.feature(topology, topology.objects.tracts).features)
+                        .enter().append("path")
+                        .attr("fill", function (d) {
+                            return color_change(d.properties.density);
+                        })
+                        .attr("stroke", "#000")
+                        .attr("stroke-opacity", 0.3)
+                        .attr("d", path);
+
+                    svg.append("path")
+                        .datum(topojson.feature(topology, topology.objects.counties))
+                        .attr("fill", "none")
+                        .attr("stroke", "#000")
+                        .attr("stroke-opacity", 0.3)
+                        .attr("d", path);
+                });
+            }
+        }
+    }
+
+</script>
+    <div>
+        <p>Github link: <a href="">Iowa_Population_Density_2016</a></p>
+        <p>Yangjie Tao</p>
+        <p>Reference: <a href="https://bl.ocks.org/mbostock/39b34968ad5eab65de1d7da81f78bb27">California Population Density</a></p>
+        <p>Instructor: Suresh Lodha</p>
+        <p>CMPS 263: Data programming for Visualization</p>
+        <p>Winter 2018</p>
+    </div>
+</body>
+</html>
